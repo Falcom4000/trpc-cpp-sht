@@ -6,6 +6,13 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files(["fiber_client.yaml"])
 
+filegroup(
+    name = "unit_test_resources",
+    srcs = [
+        "trpc_cpp_client_fiber.yaml",
+    ],
+)
+
 cc_library(
     name = "client_context_testing",
     hdrs = ["client_context_testing.h"],

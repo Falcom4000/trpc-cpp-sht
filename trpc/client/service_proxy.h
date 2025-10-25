@@ -34,6 +34,9 @@
 
 namespace trpc {
 
+struct TrpcSelectorInfo;
+struct TrpcEndpointInfo;
+
 /// @brief Base class of service proxy.
 class ServiceProxy {
  public:
@@ -136,6 +139,14 @@ class ServiceProxy {
   /// @brief Get the threadmodel used by service proxy.
   ThreadModel* GetThreadModel();
 
+  /// @brief 根据ClientContext及ServiceProxy本身信息填充广播类TrpcSelectorInfo
+  void MakeTrpcSelectorInfoForBroadcast(const ClientContextPtr& broadcast_context,
+                                        TrpcSelectorInfo& trpc_selector_info);
+
+  /// @brief 根据用户的广播Client及要访问的下游节点信息设置真正RPC的ClientContext
+  void SetClientContextForBroadcast(const ClientContextPtr& broadcast_context, const TrpcEndpointInfo& endpoint,
+                                    ClientContextPtr& rpc_context);
+
   /// @brief Init transport used by service proxy. By default, the framework uses its built-in transport.
   /// @note Subclasses can implement transport by overriding this method themselves.
   virtual void InitTransport();
@@ -175,19 +186,19 @@ class ServiceProxy {
   // Error handling, it will set error information to context.
   void HandleError(const ClientContextPtr& context, int ret, std::string&& err_msg);
 
-  // Set the host/port for direct connection to the service, used when the selector is 'domain' or 'direct'.
-  // endpoint_info is a comma-separated list of host and port. The supported formats are as follows:
-  // 1. ipv4:port, as: 127.0.0.1:90
-  // 2. [ipv6]:port, as: [::1]:90
-  // 3. domain:port(only applicable when the selector is 'domain'), as: www.qq.com:8080
-  void SetEndpointInfo(const std::string& endpoint_info);
-
  protected:
   ClientCodecPtr codec_;
 
   std::unique_ptr<ClientTransport> transport_{nullptr};
 
   ClientFilterController filter_controller_;
+
+  // Set the host/port for direct connection to the service, used when the selector is 'domain' or 'direct'.
+  // endpoint_info is a comma-separated list of host and port. The supported formats are as follows:
+  // 1. ipv4:port, as: 127.0.0.1:90
+  // 2. [ipv6]:port, as: [::1]:90
+  // 3. domain:port(only applicable when the selector is 'domain'), as: www.qq.com:8080
+  void SetEndpointInfo(const std::string& endpoint_info);
 
  private:
   std::shared_ptr<ServiceProxyOption> option_;

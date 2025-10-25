@@ -385,6 +385,21 @@ class ClientContext : public RefCounted<ClientContext> {
   /// @brief Indicates whether address of remote service instance is set by user.
   bool IsSetAddr() { return GetStateFlag(kIsSetAddrMask); }
 
+  /// @brief Set the IP address of remote service instance.
+  void SetIp(const std::string& ip) {
+    endpoint_info_.addr.ip = ip;
+    endpoint_info_.addr.addr_type =
+        ip.find(':') != std::string::npos ? NodeAddr::AddrType::kIpV6 : NodeAddr::AddrType::kIpV4;
+  }
+
+  /// @brief Set the port of remote service instance.
+  void SetPort(uint16_t port) { endpoint_info_.addr.port = port; }
+
+  /// @brief Set whether IP address of remote service is IPv6.
+  void SetIsIpv6(bool is_ipv6) {
+    endpoint_info_.addr.addr_type = is_ipv6 ? NodeAddr::AddrType::kIpV6 : NodeAddr::AddrType::kIpV4;
+  }
+
   /// @brief Set the IP address and port of remote service instance.
   /// @note It is provided for user to set IP:Port for remote service instance.
   /// The request will be send directly to the address of remote service instance set by user after this function

@@ -249,6 +249,7 @@ std::string GenProxy(const ::google::protobuf::ServiceDescriptor* desc, int inde
           method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()),
           GetParamterTypeWithNamespace(method->output_type()->full_name()));
       out += LineFeed(indent);
+
       out += fmt::format(
           "virtual ::trpc::Future<{0}> Async{1}(const ::trpc::ClientContextPtr& context, const {2}& request);",
           GetParamterTypeWithNamespace(method->output_type()->full_name()), method->name(),
@@ -258,6 +259,32 @@ std::string GenProxy(const ::google::protobuf::ServiceDescriptor* desc, int inde
       out += LineFeed(indent);
       out += fmt::format("virtual ::trpc::Status {0}(const ::trpc::ClientContextPtr& context, const {1}& request);",
                          method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()));
+
+      out += LineFeed(indent);
+      out += "// 广播同步调用接口";
+      out += LineFeed(indent);
+      out += fmt::format(
+          "virtual ::trpc::Status Broadcast{0}(const ::trpc::ClientContextPtr& broadcast_context, const {1}& request, "
+          "std::vector<std::tuple<::trpc::Status,{2}>>* response);",
+          method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()),
+          GetParamterTypeWithNamespace(method->output_type()->full_name()));
+
+      out += LineFeed(indent);
+      out += "// 广播同步单向调用接口";
+      out += LineFeed(indent);
+      out += fmt::format(
+          "virtual ::trpc::Status Broadcast{0}(const ::trpc::ClientContextPtr& broadcast_context, const {1}& request);",
+          method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()));
+
+      out += LineFeed(indent);
+      out += "// 广播异步Future调用接口";
+      out += LineFeed(indent);
+      out += fmt::format(
+          "virtual ::trpc::Future<::trpc::Status, std::vector<std::tuple<::trpc::Status,{0}>>> AsyncBroadcast{1}(const "
+          "::trpc::ClientContextPtr& broadcast_context, const {2}& request);",
+          GetParamterTypeWithNamespace(method->output_type()->full_name()), method->name(),
+          GetParamterTypeWithNamespace(method->input_type()->full_name()));
+
     } else if (client_stream && !server_stream) {
       out += fmt::format(
           "virtual ::trpc::stream::StreamWriter<{0}> {1}(const ::trpc::ClientContextPtr& context, {2}* response);",

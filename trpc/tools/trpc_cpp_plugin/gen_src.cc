@@ -400,6 +400,31 @@ static std::string GenProxySyncCall(const ::google::protobuf::ServiceDescriptor*
                          GetParamterTypeWithNamespace(method->output_type()->full_name()));
       out += LineFeed(indent);
       out += "}";
+
+      // 生成广播同步调用接口
+      out += LineFeed(indent);
+      out += LineFeed(indent);
+      out += fmt::format(
+          "::trpc::Status {0}ServiceProxy::Broadcast{1}(const ::trpc::ClientContextPtr& broadcast_context, const {2}& "
+          "request, std::vector<std::tuple<::trpc::Status,{3}>>* response) {{",
+          serviceName, method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()),
+          GetParamterTypeWithNamespace(method->output_type()->full_name()));
+      out += LineFeed(1);
+      out += fmt::format("if (broadcast_context->GetFuncName().empty()) broadcast_context->SetFuncName({0}[{1}][0].data());",
+                         methodArrayName, std::to_string(i));
+      if (enable_explicit_link_proto) {
+        out += LineFeed(1);
+        out += fmt::format(
+            "if (broadcast_context->GetProtobufMethodDescriptor() == nullptr && {0}::GetServiceDescriptor() != nullptr) "
+            "broadcast_context->SetProtobufMethodDescriptor({0}::GetServiceDescriptor()->method({1}));",
+            serviceName, std::to_string(method->index()));
+      }
+      out += LineFeed(1);
+      out += fmt::format("return BroadcastUnaryInvoke<{0}, {1}>(broadcast_context, request, response);",
+                         GetParamterTypeWithNamespace(method->input_type()->full_name()),
+                         GetParamterTypeWithNamespace(method->output_type()->full_name()));
+      out += LineFeed(indent);
+      out += "}";
     } else if (client_stream && !server_stream) {
       out += fmt::format(
           "::trpc::stream::StreamWriter<{0}> {1}ServiceProxy::{2}(const ::trpc::ClientContextPtr& context, {3}* "
@@ -509,6 +534,29 @@ static std::string GenProxyOnewayCall(const ::google::protobuf::ServiceDescripto
                        GetParamterTypeWithNamespace(method->input_type()->full_name()));
     out += LineFeed(indent);
     out += "}";
+
+    // 生成广播同步单向调用接口
+    out += LineFeed(indent);
+    out += LineFeed(indent);
+    out += fmt::format(
+        "::trpc::Status {0}ServiceProxy::Broadcast{1}(const ::trpc::ClientContextPtr& broadcast_context, const {2}& "
+        "request) {{",
+        serviceName, method->name(), GetParamterTypeWithNamespace(method->input_type()->full_name()));
+    out += LineFeed(1);
+    out += fmt::format("if (broadcast_context->GetFuncName().empty()) broadcast_context->SetFuncName({0}[{1}][0].data());",
+                       methodArrayName, std::to_string(i));
+    if (enable_explicit_link_proto) {
+      out += LineFeed(1);
+      out += fmt::format(
+          "if (broadcast_context->GetProtobufMethodDescriptor() == nullptr && {0}::GetServiceDescriptor() != nullptr) "
+          "broadcast_context->SetProtobufMethodDescriptor({0}::GetServiceDescriptor()->method({1}));",
+          serviceName, std::to_string(method->index()));
+    }
+    out += LineFeed(1);
+    out += fmt::format("return BroadcastOnewayInvoke<{0}>(broadcast_context, request);",
+                       GetParamterTypeWithNamespace(method->input_type()->full_name()));
+    out += LineFeed(indent);
+    out += "}";
   }
   return out;
 }
@@ -555,6 +603,31 @@ static std::string GenProxyAsyncCall(const ::google::protobuf::ServiceDescriptor
     }
     out += LineFeed(indent + 1);
     out += fmt::format("return AsyncUnaryInvoke<{0}, {1}>(context, request);",
+                       GetParamterTypeWithNamespace(method->input_type()->full_name()),
+                       GetParamterTypeWithNamespace(method->output_type()->full_name()));
+    out += LineFeed(indent);
+    out += "}";
+
+    // 生成广播异步Future调用接口
+    out += LineFeed(indent);
+    out += LineFeed(indent);
+    out += fmt::format(
+        "::trpc::Future<::trpc::Status, std::vector<std::tuple<::trpc::Status,{0}>>> "
+        "{1}ServiceProxy::AsyncBroadcast{2}(const ::trpc::ClientContextPtr& broadcast_context, const {3}& request) {{",
+        GetParamterTypeWithNamespace(method->output_type()->full_name()), serviceName, method->name(),
+        GetParamterTypeWithNamespace(method->input_type()->full_name()));
+    out += LineFeed(1);
+    out += fmt::format("if (broadcast_context->GetFuncName().empty()) broadcast_context->SetFuncName({0}[{1}][0].data());",
+                       methodArrayName, std::to_string(i));
+    if (enable_explicit_link_proto) {
+      out += LineFeed(1);
+      out += fmt::format(
+          "if (broadcast_context->GetProtobufMethodDescriptor() == nullptr && {0}::GetServiceDescriptor() != nullptr) "
+          "broadcast_context->SetProtobufMethodDescriptor({0}::GetServiceDescriptor()->method({1}));",
+          serviceName, std::to_string(method->index()));
+    }
+    out += LineFeed(1);
+    out += fmt::format("return AsyncBroadcastUnaryInvoke<{0}, {1}>(broadcast_context, request);",
                        GetParamterTypeWithNamespace(method->input_type()->full_name()),
                        GetParamterTypeWithNamespace(method->output_type()->full_name()));
     out += LineFeed(indent);

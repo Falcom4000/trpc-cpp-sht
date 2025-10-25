@@ -157,12 +157,14 @@ cc_library(
 cc_test(
     name = "rpc_service_proxy_test",
     srcs = ["rpc_service_proxy_test.cc"],
+    data = ["//trpc/client/testing:unit_test_resources"],
     deps = [
         ":rpc_service_proxy",
         ":service_proxy_option_setter",
         "//trpc/client:make_client_context",
         "//trpc/client/testing:service_proxy_testing",
         "//trpc/codec/trpc/testing:trpc_protocol_testing",
+        "//trpc/common:runtime_manager",
         "//trpc/future:future_utility",
         "//trpc/proto/testing:cc_helloworld_proto",
         "//trpc/proto/testing:helloworld_fbs",

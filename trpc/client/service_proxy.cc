@@ -207,11 +207,14 @@ void ServiceProxy::UnaryTransportInvoke(const ClientContextPtr& context, const P
     return;
   }
 
-  std::string error("service name:");
+  // 错误信息统一处理
+  std::string error("target address: ");
+  error += context->GetIp() + ":" + std::to_string(context->GetPort());
+  error += ", service name:";
   error += GetServiceName();
   error += ", transport name:";
   error += transport_->Name();
-  error += ", sendrcv failed";
+  error += " sendrcv failed";
   HandleError(context, ret, std::move(error));
 }
 
@@ -286,7 +289,10 @@ Future<ProtocolPtr> ServiceProxy::AsyncUnaryTransportInvoke(const ClientContextP
 
     Exception ex = fut.GetException();
 
-    std::string error("service name:");
+    // 错误统一处理
+    std::string error("target address: ");
+    error += context->GetIp() + ":" + std::to_string(context->GetPort());
+    error += ", service name:";
     error += GetServiceName();
     error += ", transport name:";
     error += transport_->Name();
@@ -393,6 +399,57 @@ ThreadModel* ServiceProxy::GetThreadModel() {
   TRPC_ASSERT(thread_model_ != nullptr && "service proxy thread_model is nullptr");
 
   return thread_model_;
+}
+
+void ServiceProxy::MakeTrpcSelectorInfoForBroadcast(const ClientContextPtr& broadcast_context,
+                                                    TrpcSelectorInfo& trpc_selector_info) {
+  trpc_selector_info.plugin_name = option_->selector_name;
+  SelectorInfo& selector_info = trpc_selector_info.selector_info;
+  selector_info.name = GetServiceName();
+  selector_info.context = broadcast_context;
+  // 广播默认访问IDC下节点
+  selector_info.policy = SelectorPolicy::IDC;
+  if (!option_->callee_set_name.empty()) {
+    // 如果启用了Set就优先访问同Set下节点
+    selector_info.policy = SelectorPolicy::SET;
+    selector_info.context->SetCalleeSetName(option_->callee_set_name);
+  }
+  selector_info.context->SetNamespace(option_->name_space);
+}
+
+void ServiceProxy::SetClientContextForBroadcast(const ClientContextPtr& broadcast_context,
+                                                const TrpcEndpointInfo& endpoint, ClientContextPtr& rpc_context) {
+  // Use SetRequestAddrByNaming to set address and mark IsSetAddr flag as true,
+  // preventing duplicate selector invocation in UnaryInvoke's filter chain
+  ExtendNodeAddr addr;
+  addr.addr.ip = endpoint.host;
+  addr.addr.port = endpoint.port;
+  addr.addr.addr_type = endpoint.is_ipv6 ? NodeAddr::AddrType::kIpV6 : NodeAddr::AddrType::kIpV4;
+  
+  // Copy metadata from endpoint to preserve Set/Container information if available
+  for (const auto& kv : endpoint.meta) {
+    addr.metadata[kv.first] = kv.second;
+  }
+  
+  rpc_context->SetRequestAddrByNaming(std::move(addr));
+  rpc_context->SetCallerName(broadcast_context->GetCalleeName());
+  if (!broadcast_context->GetFuncName().empty()) {
+    rpc_context->SetFuncName(broadcast_context->GetFuncName());
+  }
+
+  // 如果用户在broadcast_context设置了超时时间，沿用
+  if (broadcast_context->GetTimeout() > 0) {
+    rpc_context->SetTimeout(broadcast_context->GetTimeout());
+  }
+
+  // 将broadcast_context中ServerContext相关内容透传给rpc_context
+  const auto& trans_info = broadcast_context->GetPbReqTransInfo();
+  if (trans_info.size() > 0) {
+    rpc_context->SetReqTransInfo(trans_info.begin(), trans_info.end());
+  }
+  rpc_context->SetMessageType(broadcast_context->GetMessageType());
+  rpc_context->SetCallerName(broadcast_context->GetCalleeName());
+  rpc_context->SetCallerFuncName(broadcast_context->GetCallerFuncName());
 }
 
 void ServiceProxy::FillClientContext(const ClientContextPtr& context) {
@@ -647,7 +704,10 @@ void ServiceProxy::OnewayTransportInvoke(const ClientContextPtr& context, const 
     return;
   }
 
-  std::string error("service name:");
+  // 统一处理错误
+  std::string error("target address: ");
+  error += context->GetIp() + ":" + std::to_string(context->GetPort());
+  error += ", service name:";
   error += GetServiceName();
   error += ", transport name:";
   error += transport_->Name();

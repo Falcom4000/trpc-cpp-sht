@@ -22,7 +22,6 @@
 #include "google/protobuf/compiler/plugin.pb.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/port_def.inc"
-
 #include "trpc/tools/comm/utils.h"
 
 using namespace trpc::tools;
