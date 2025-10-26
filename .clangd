@@ -1,0 +1,21 @@
+CompileFlags:
+  # 使用生成的 compile_commands.json
+  CompilationDatabase: .
+  
+  # 添加额外的编译参数
+  Add:
+    - "-std=c++17"
+    - "-Wall"
+    - "-Wextra"
+  
+  # 移除不需要的警告
+  Remove:
+    - "-W*"
+
+Diagnostics:
+  # 禁用某些警告
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+Index:
+  Background: Build
