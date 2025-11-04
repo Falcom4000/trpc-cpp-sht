@@ -30,6 +30,7 @@ cc_library(
         ":redis_client_conf",
         ":retry_conf",
         ":ssl_conf",
+        "//trpc/client/mysql:mysql_common",
         "//trpc/util/log:logging",
     ],
 )
@@ -39,6 +40,7 @@ cc_library(
     hdrs = ["client_conf_parser.h"],
     deps = [
         ":client_conf",
+        ":mysql_client_conf_parser",
         ":redis_client_conf_parser",
         ":retry_conf_parser",
         ":ssl_conf_parser",
@@ -122,6 +124,15 @@ cc_library(
     hdrs = ["redis_client_conf_parser.h"],
     deps = [
         ":redis_client_conf",
+        "@com_github_jbeder_yaml_cpp//:yaml-cpp",
+    ],
+)
+
+cc_library(
+    name = "mysql_client_conf_parser",
+    hdrs = ["mysql_client_conf_parser.h"],
+    deps = [
+        "//trpc/client/mysql:mysql_common",
         "@com_github_jbeder_yaml_cpp//:yaml-cpp",
     ],
 )

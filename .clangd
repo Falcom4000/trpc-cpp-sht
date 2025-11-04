@@ -14,8 +14,8 @@ CompileFlags:
 
 Diagnostics:
   # 禁用某些警告
-  UnusedIncludes: Strict
-  MissingIncludes: Strict
+  SuppressAll: true
+
 
 Index:
   Background: Build

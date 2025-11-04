@@ -21,6 +21,7 @@
 #include "trpc/client/service_proxy_option.h"
 #include "trpc/common/config/redis_client_conf.h"
 #include "trpc/common/config/ssl_conf.h"
+#include "trpc/client/mysql/mysql_common.h"
 
 namespace trpc {
 namespace detail {
@@ -58,6 +59,10 @@ void SetOutputByValidInput(const RedisClientConf& input, RedisClientConf& output
 // If the field of ClientSslConfig isn't the default value, it means that the user has set it and it needs to be
 // assigned.
 void SetOutputByValidInput(const ClientSslConfig& input, ClientSslConfig& output);
+
+// If the field of MysqlConnectionConfig isn't the default value, it means that the user has set it and it needs to be
+// assigned.
+void SetOutputByValidInput(const mysql::MysqlConnectionConfig& input, mysql::MysqlConnectionConfig& output);
 
 // Set the default value of ServiceProxyOption.
 void SetDefaultOption(const std::shared_ptr<ServiceProxyOption>& option);

@@ -24,6 +24,7 @@
 #include "trpc/common/config/redis_client_conf.h"
 #include "trpc/common/config/retry_conf.h"
 #include "trpc/common/config/ssl_conf.h"
+#include "trpc/client/mysql/mysql_common.h"
 #include "trpc/util/log/logging.h"
 
 namespace trpc {
@@ -161,6 +162,9 @@ struct ServiceProxyConfig {
 
   /// Redis auth config
   RedisClientConf redis_conf;
+
+  /// MySQL connection config
+  mysql::MysqlConnectionConfig mysql_conf;
 
   /// The number of FiberConnectionPool shard groups for the idle queue.
   /// A larger value of this parameter will result in a higher allocation of connections, leading to better parallelism

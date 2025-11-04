@@ -26,6 +26,7 @@ cc_library(
     name = "service_proxy_option",
     hdrs = ["service_proxy_option.h"],
     deps = [
+        "//trpc/client/mysql:mysql_common",
         "//trpc/common/config:default_value",
         "//trpc/common/config:redis_client_conf",
         "//trpc/common/config:ssl_conf",
@@ -42,6 +43,7 @@ cc_library(
     hdrs = ["service_proxy_option_setter.h"],
     deps = [
         "//trpc/client:service_proxy_option",
+        "//trpc/client/mysql:mysql_common",
         "//trpc/common/config:redis_client_conf",
         "//trpc/common/config:ssl_conf",
     ],

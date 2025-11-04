@@ -48,6 +48,7 @@ void ServiceProxyManager::SetOptionFromConfig(const ServiceProxyConfig& proxy_co
   option->load_balance_type = GetLoadBalanceType(proxy_conf.load_balance_type);
 
   option->redis_conf = proxy_conf.redis_conf;
+  option->mysql_conf = proxy_conf.mysql_conf;
   // Set SSL/TLS config for client.
   option->ssl_config = proxy_conf.ssl_config;
   option->support_pipeline = proxy_conf.support_pipeline;

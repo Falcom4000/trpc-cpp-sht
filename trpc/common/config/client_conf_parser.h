@@ -19,6 +19,7 @@
 #include "trpc/common/config/redis_client_conf_parser.h"
 #include "trpc/common/config/retry_conf_parser.h"
 #include "trpc/common/config/ssl_conf_parser.h"
+#include "trpc/common/config/mysql_client_conf_parser.h"
 
 namespace YAML {
 
@@ -70,6 +71,8 @@ struct convert<trpc::ServiceProxyConfig> {
     if (proxy_config.redis_conf.enable) {
       node["redis"] = proxy_config.redis_conf;
     }
+
+    node["mysql"] = proxy_config.mysql_conf;
 
     node["fiber_connpool_shards"] = proxy_config.fiber_connpool_shards;
 
@@ -137,6 +140,10 @@ struct convert<trpc::ServiceProxyConfig> {
     if (node["redis"]) {
       proxy_config.redis_conf = node["redis"].as<trpc::RedisClientConf>();
       proxy_config.redis_conf.enable = true;
+    }
+
+    if (node["mysql"]) {
+      proxy_config.mysql_conf = node["mysql"].as<trpc::mysql::MysqlConnectionConfig>();
     }
 
     if (node["fiber_connpool_shards"]) {

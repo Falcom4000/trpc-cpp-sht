@@ -71,6 +71,47 @@ void SetOutputByValidInput(const ClientSslConfig& input, ClientSslConfig& output
   SetOutputByValidInput<bool>(insecure, output.insecure);
 }
 
+void SetOutputByValidInput(const mysql::MysqlConnectionConfig& input, mysql::MysqlConnectionConfig& output) {
+  auto host = GetValidInput<std::string>(input.host, "127.0.0.1");
+  SetOutputByValidInput<std::string>(host, output.host);
+
+  auto port = GetValidInput<std::uint16_t>(input.port, 3306);
+  SetOutputByValidInput<std::uint16_t>(port, output.port);
+
+  auto user = GetValidInput<std::string>(input.user, "");
+  SetOutputByValidInput<std::string>(user, output.user);
+
+  auto password = GetValidInput<std::string>(input.password, "");
+  SetOutputByValidInput<std::string>(password, output.password);
+
+  auto database = GetValidInput<std::string>(input.database, "");
+  SetOutputByValidInput<std::string>(database, output.database);
+
+  auto charset = GetValidInput<std::string>(input.charset, "utf8mb4");
+  SetOutputByValidInput<std::string>(charset, output.charset);
+
+  auto connect_timeout_ms = GetValidInput<std::uint32_t>(input.connect_timeout_ms, 3000);
+  SetOutputByValidInput<std::uint32_t>(connect_timeout_ms, output.connect_timeout_ms);
+
+  auto read_timeout_ms = GetValidInput<std::uint32_t>(input.read_timeout_ms, 30000);
+  SetOutputByValidInput<std::uint32_t>(read_timeout_ms, output.read_timeout_ms);
+
+  auto write_timeout_ms = GetValidInput<std::uint32_t>(input.write_timeout_ms, 30000);
+  SetOutputByValidInput<std::uint32_t>(write_timeout_ms, output.write_timeout_ms);
+
+  auto max_connections = GetValidInput<std::uint32_t>(input.max_connections, 100);
+  SetOutputByValidInput<std::uint32_t>(max_connections, output.max_connections);
+
+  auto min_idle_connections = GetValidInput<std::uint32_t>(input.min_idle_connections, 5);
+  SetOutputByValidInput<std::uint32_t>(min_idle_connections, output.min_idle_connections);
+
+  auto max_idle_time_ms = GetValidInput<std::uint32_t>(input.max_idle_time_ms, 60000);
+  SetOutputByValidInput<std::uint32_t>(max_idle_time_ms, output.max_idle_time_ms);
+
+  auto executor_thread_num = GetValidInput<std::uint32_t>(input.executor_thread_num, 8);
+  SetOutputByValidInput<std::uint32_t>(executor_thread_num, output.executor_thread_num);
+}
+
 // Set a std::map, use the values in input to overwrite the corresponding values in output.
 void SetOutputByValidInput(const std::map<std::string, std::any>& input, std::map<std::string, std::any>& output) {
   for (auto& item : input) {
@@ -200,6 +241,7 @@ void SetSpecifiedOption(const ServiceProxyOption* option_ptr, const std::shared_
   SetOutputByValidInput(option_ptr->service_filters, option->service_filters);
   SetOutputByValidInput(option_ptr->proxy_callback, option->proxy_callback);
   SetOutputByValidInput(option_ptr->redis_conf, option->redis_conf);
+  SetOutputByValidInput(option_ptr->mysql_conf, option->mysql_conf);
   SetOutputByValidInput(option_ptr->ssl_config, option->ssl_config);
 
   auto support_pipeline = GetValidInput<bool>(option_ptr->support_pipeline, kDefaultSupportPipeline);
