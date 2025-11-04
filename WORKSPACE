@@ -4,6 +4,12 @@ load("//trpc:workspace.bzl", "trpc_workspace")
 
 trpc_workspace()
 
+# MySQL client library (system installation)
+local_repository(
+    name = "com_github_mysql_mysql",
+    path = "third_party/com_github_mysql_mysql",
+)
+
 # Hedron's Compile Commands Extractor for Bazel
 # https://github.com/hedronvision/bazel-compile-commands-extractor
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")

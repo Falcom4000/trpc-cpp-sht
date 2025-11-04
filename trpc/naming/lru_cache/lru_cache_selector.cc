@@ -15,6 +15,7 @@
 
 #include <sstream>
 
+#include "trpc/naming/common/common_inc_deprecated.h"
 #include "trpc/util/log/logging.h"
 
 namespace trpc {
@@ -56,11 +57,11 @@ std::string LruCacheSelector::GenerateCacheKey(const SelectorInfo* info) const {
     oss << ":" << info->load_balance_name;
   }
 
-  // Include namespace if available in context
-  if (info->context) {
-    const std::string& ns = info->context->GetNamespace();
-    if (!ns.empty()) {
-      oss << ":ns=" << ns;
+  // Include namespace if available in extend_select_info
+  if (info->extend_select_info) {
+    const auto* naming_info = std::any_cast<const NamingExtendSelectInfo>(info->extend_select_info);
+    if (naming_info && !naming_info->name_space.empty()) {
+      oss << ":ns=" << naming_info->name_space;
     }
   }
 
@@ -80,11 +81,11 @@ std::string LruCacheSelector::GenerateBatchCacheKey(const SelectorInfo* info) co
     oss << ":" << info->load_balance_name;
   }
 
-  // Include namespace if available in context
-  if (info->context) {
-    const std::string& ns = info->context->GetNamespace();
-    if (!ns.empty()) {
-      oss << ":ns=" << ns;
+  // Include namespace if available in extend_select_info
+  if (info->extend_select_info) {
+    const auto* naming_info = std::any_cast<const NamingExtendSelectInfo>(info->extend_select_info);
+    if (naming_info && !naming_info->name_space.empty()) {
+      oss << ":ns=" << naming_info->name_space;
     }
   }
 

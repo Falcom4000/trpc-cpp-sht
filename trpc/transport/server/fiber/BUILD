@@ -6,7 +6,10 @@ cc_library(
     name = "fiber_server_transport",
     srcs = glob(
         ["*.cc"],
-        exclude = ["*_test.cc"],
+        exclude = [
+            "*_test.cc",
+            "lru_cache_connection_manager.cc",
+        ],
     ),
     hdrs = glob(
         ["*.h"],
