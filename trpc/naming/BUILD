@@ -177,5 +177,6 @@ cc_library(
         "//trpc/naming/direct:selector_direct",
         "//trpc/naming/domain:domain_selector_filter",
         "//trpc/naming/domain:selector_domain",
+        "//trpc/naming/lru_cache:lru_polaris_selector",
     ],
 )

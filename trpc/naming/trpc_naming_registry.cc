@@ -24,6 +24,7 @@
 #include "trpc/naming/limiter.h"
 #include "trpc/naming/limiter_factory.h"
 #include "trpc/naming/load_balance_factory.h"
+#include "trpc/naming/lru_cache/lru_polaris_selector.h"
 #include "trpc/naming/registry.h"
 #include "trpc/naming/registry_factory.h"
 #include "trpc/naming/selector.h"
@@ -55,6 +56,11 @@ void RegisterInnerSelector() {
   MessageClientFilterPtr domain_selector_filter = std::make_shared<DomainSelectorFilter>();
   domain_selector_filter->Init();
   FilterManager::GetInstance()->AddMessageClientFilter(domain_selector_filter);
+
+  // Register LRU cached Polaris selector (if Polaris plugin is available)
+  // This allows users to use "lru_polaris" directly in config file
+  SelectorPtr lru_polaris_selector = MakeRefCounted<LruPolarisSelector>();
+  SelectorFactory::GetInstance()->Register(lru_polaris_selector);
 }
 
 // Stop the Selector thread inside trpc: currently contains domain and direct plugins.
