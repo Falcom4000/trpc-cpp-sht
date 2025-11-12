@@ -21,6 +21,15 @@
 
 namespace trpc::mysql {
 
+// -------- Handle impl --------
+void MysqlConnectionPool::Handle::Reset() {
+  if (pool_ && conn_) {
+    pool_->ReturnConnection(std::move(conn_));
+    pool_ = nullptr;
+  }
+}
+MysqlConnectionPool::Handle::~Handle() { Reset(); }
+
 MysqlConnectionPool::MysqlConnectionPool(const MysqlConnectionConfig& config)
     : config_(config) {
 }
@@ -44,6 +53,7 @@ bool MysqlConnectionPool::Start() {
     }
     idle_connections_.push_back(std::move(conn));
   }
+  total_connections_.store(idle_connections_.size(), std::memory_order_release);
   
   TRPC_FMT_INFO("MySQL connection pool started with {} initial connections",
                 idle_connections_.size());
@@ -69,9 +79,14 @@ void MysqlConnectionPool::Stop() {
   
   std::lock_guard<std::mutex> lock(mutex_);
   idle_connections_.clear();
-  active_connections_.clear();
+  total_connections_.store(0, std::memory_order_release);
   
   TRPC_FMT_INFO("MySQL connection pool stopped");
+}
+
+MysqlConnectionPool::Handle MysqlConnectionPool::Borrow(uint32_t timeout_ms) {
+  MysqlConnectionPtr conn = GetConnection(timeout_ms);
+  return Handle(this, std::move(conn));
 }
 
 MysqlConnectionPtr MysqlConnectionPool::GetConnection(uint32_t timeout_ms) {
@@ -89,23 +104,24 @@ MysqlConnectionPtr MysqlConnectionPool::GetConnection(uint32_t timeout_ms) {
       // Check if connection is still valid
       if (conn->IsValid()) {
         conn->UpdateLastUsedTime();
-        active_connections_.insert(conn);
         return conn;
       }
       // Connection is invalid, try next one
+      // Adjust total as this connection will be destroyed when shared_ptr goes out of scope
+      total_connections_.fetch_sub(1, std::memory_order_acq_rel);
       continue;
     }
     
     // 2. Create new connection if under limit
-    size_t total = idle_connections_.size() + active_connections_.size();
+    size_t total = total_connections_.load(std::memory_order_acquire);
     if (total < config_.max_connections) {
       lock.unlock();
       auto conn = CreateConnection();
       lock.lock();
       
       if (conn) {
+        total_connections_.fetch_add(1, std::memory_order_acq_rel);
         conn->UpdateLastUsedTime();
-        active_connections_.insert(conn);
         return conn;
       }
     }
@@ -127,17 +143,12 @@ void MysqlConnectionPool::ReturnConnection(MysqlConnectionPtr conn) {
   
   std::lock_guard<std::mutex> lock(mutex_);
   
-  auto it = active_connections_.find(conn);
-  if (it != active_connections_.end()) {
-    active_connections_.erase(it);
-    
-    // Reset connection state and return to idle pool
-    conn->Reset();
-    conn->UpdateLastUsedTime();
-    idle_connections_.push_back(conn);
-    
-    cv_.notify_one();
-  }
+  // Reset connection state and return to idle pool
+  conn->Reset();
+  conn->UpdateLastUsedTime();
+  idle_connections_.push_back(std::move(conn));
+  
+  cv_.notify_one();
 }
 
 MysqlConnectionPool::PoolStats MysqlConnectionPool::GetStats() const {
@@ -145,8 +156,10 @@ MysqlConnectionPool::PoolStats MysqlConnectionPool::GetStats() const {
   
   PoolStats stats;
   stats.idle_count = idle_connections_.size();
-  stats.active_count = active_connections_.size();
-  stats.total_count = stats.idle_count + stats.active_count;
+  stats.total_count = total_connections_.load(std::memory_order_acquire);
+  stats.active_count = stats.total_count >= stats.idle_count
+                           ? stats.total_count - stats.idle_count
+                           : 0;
   
   return stats;
 }
@@ -230,6 +243,7 @@ void MysqlConnectionPool::CloseIdleConnections() {
     
     if (should_remove) {
       it = idle_connections_.erase(it);
+      total_connections_.fetch_sub(1, std::memory_order_acq_rel);
     } else {
       ++it;
     }
@@ -240,7 +254,7 @@ void MysqlConnectionPool::EnsureMinIdleConnections() {
   std::lock_guard<std::mutex> lock(mutex_);
   
   while (idle_connections_.size() < config_.min_idle_connections) {
-    size_t total = idle_connections_.size() + active_connections_.size();
+    size_t total = total_connections_.load(std::memory_order_acquire);
     if (total >= config_.max_connections) {
       break;
     }
@@ -251,7 +265,9 @@ void MysqlConnectionPool::EnsureMinIdleConnections() {
       break;
     }
     
+    total_connections_.fetch_add(1, std::memory_order_acq_rel);
     idle_connections_.push_back(conn);
+    cv_.notify_one();
   }
 }
 

@@ -19,7 +19,6 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <unordered_set>
 
 #include "trpc/client/mysql/mysql_common.h"
 #include "trpc/client/mysql/mysql_connection.h"
@@ -29,6 +28,41 @@ namespace trpc::mysql {
 /// @brief MySQL connection pool for managing database connections
 class MysqlConnectionPool {
  public:
+  /// @brief RAII handle for a borrowed connection
+  class Handle {
+   public:
+    Handle() = default;
+    Handle(MysqlConnectionPool* pool, MysqlConnectionPtr conn)
+        : pool_(pool), conn_(std::move(conn)) {}
+    ~Handle();
+    Handle(const Handle&) = delete;
+    Handle& operator=(const Handle&) = delete;
+    Handle(Handle&& other) noexcept { MoveFrom(std::move(other)); }
+    Handle& operator=(Handle&& other) noexcept {
+      if (this != &other) {
+        Reset();
+        MoveFrom(std::move(other));
+      }
+      return *this;
+    }
+    explicit operator bool() const { return static_cast<bool>(conn_); }
+    MysqlConnectionPtr Get() const { return conn_; }
+    MysqlConnectionPtr Release() {
+      MysqlConnectionPtr tmp = std::move(conn_);
+      pool_ = nullptr;
+      return tmp;
+    }
+    void Reset();
+   private:
+    void MoveFrom(Handle&& other) {
+      pool_ = other.pool_;
+      conn_ = std::move(other.conn_);
+      other.pool_ = nullptr;
+    }
+    MysqlConnectionPool* pool_{nullptr};
+    MysqlConnectionPtr conn_;
+  };
+
   /// @brief Constructor with configuration
   explicit MysqlConnectionPool(const MysqlConnectionConfig& config);
   
@@ -48,14 +82,8 @@ class MysqlConnectionPool {
   /// @brief Stop the connection pool
   void Stop();
   
-  /// @brief Get a connection from the pool
-  /// @param timeout_ms Timeout in milliseconds
-  /// @return Connection pointer, nullptr on timeout or error
-  MysqlConnectionPtr GetConnection(uint32_t timeout_ms = 3000);
-  
-  /// @brief Return a connection to the pool
-  /// @param conn Connection to return
-  void ReturnConnection(MysqlConnectionPtr conn);
+  /// @brief Borrow a connection with RAII auto-return
+  Handle Borrow(uint32_t timeout_ms = 3000);
   
   /// @brief Get pool statistics
   struct PoolStats {
@@ -67,6 +95,15 @@ class MysqlConnectionPool {
   PoolStats GetStats() const;
   
  private:
+  /// @brief Get a connection from the pool (internal use)
+  /// @param timeout_ms Timeout in milliseconds
+  /// @return Connection pointer, nullptr on timeout or error
+  MysqlConnectionPtr GetConnection(uint32_t timeout_ms);
+  
+  /// @brief Return a connection to the pool (internal use)
+  /// @param conn Connection to return
+  void ReturnConnection(MysqlConnectionPtr conn);
+  
   /// @brief Create a new MySQL connection
   MysqlConnectionPtr CreateConnection();
   
@@ -79,14 +116,13 @@ class MysqlConnectionPool {
   /// @brief Ensure minimum idle connections
   void EnsureMinIdleConnections();
   
- private:
   MysqlConnectionConfig config_;
   
   mutable std::mutex mutex_;
   std::condition_variable cv_;
   
   std::deque<MysqlConnectionPtr> idle_connections_;
-  std::unordered_set<MysqlConnectionPtr> active_connections_;
+  std::atomic<size_t> total_connections_{0};
   
   std::atomic<bool> stopped_{false};
   std::thread health_check_thread_;

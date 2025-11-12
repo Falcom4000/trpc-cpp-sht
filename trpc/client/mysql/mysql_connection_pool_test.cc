@@ -98,16 +98,19 @@ TEST_F(MysqlConnectionPoolTest, GetAndReturnConnection) {
   MysqlConnectionPool pool(config_);
   ASSERT_TRUE(pool.Start());
   
-  auto conn = pool.GetConnection(1000);
-  ASSERT_NE(conn, nullptr);
-  EXPECT_TRUE(conn->IsValid());
+  {
+    auto handle = pool.Borrow(1000);
+    ASSERT_TRUE(handle);
+    auto conn = handle.Get();
+    ASSERT_NE(conn, nullptr);
+    EXPECT_TRUE(conn->IsValid());
+    
+    auto stats = pool.GetStats();
+    EXPECT_EQ(stats.active_count, 1u);
+  }
+  // Connection automatically returned when handle goes out of scope
   
   auto stats = pool.GetStats();
-  EXPECT_EQ(stats.active_count, 1u);
-  
-  pool.ReturnConnection(conn);
-  
-  stats = pool.GetStats();
   EXPECT_EQ(stats.active_count, 0u);
   EXPECT_GT(stats.idle_count, 0u);
   
@@ -119,14 +122,14 @@ TEST_F(MysqlConnectionPoolTest, GetConnectionTimeout) {
   MysqlConnectionPool pool(config_);
   ASSERT_TRUE(pool.Start());
   
-  auto conn1 = pool.GetConnection(1000);
-  ASSERT_NE(conn1, nullptr);
+  auto handle1 = pool.Borrow(1000);
+  ASSERT_TRUE(handle1);
   
   // Try to get another connection when pool is exhausted
-  auto conn2 = pool.GetConnection(100);
-  EXPECT_EQ(conn2, nullptr);  // Should timeout
+  auto handle2 = pool.Borrow(100);
+  EXPECT_FALSE(handle2);  // Should timeout
   
-  pool.ReturnConnection(conn1);
+  // Connection automatically returned when handle1 goes out of scope
   pool.Stop();
 }
 
@@ -141,10 +144,10 @@ TEST_F(MysqlConnectionPoolTest, ConcurrentGetAndReturn) {
   for (int i = 0; i < thread_count; ++i) {
     threads.emplace_back([&pool]() {
       for (int j = 0; j < iterations; ++j) {
-        auto conn = pool.GetConnection(1000);
-        if (conn) {
+        auto handle = pool.Borrow(1000);
+        if (handle) {
           std::this_thread::sleep_for(std::chrono::milliseconds(10));
-          pool.ReturnConnection(conn);
+          // Connection automatically returned when handle goes out of scope
         }
       }
     });

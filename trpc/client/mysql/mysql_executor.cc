@@ -15,7 +15,9 @@
 
 #include "mysql/mysql.h"
 
+#include "trpc/coroutine/fiber.h"
 #include "trpc/coroutine/fiber_latch.h"
+#include "trpc/coroutine/future.h"
 #include "trpc/future/future_utility.h"
 #include "trpc/util/log/logging.h"
 
@@ -63,7 +65,7 @@ Status MysqlExecutor::SubmitAndWait(MysqlConnectionPtr conn, const MysqlRequest&
   
   auto task = [this, conn, request, result, promise = std::move(promise)]() mutable {
     try {
-      ExecuteTask(conn->GetRawConnection(), request, result);
+      ExecutePreparedSql(conn->GetRawConnection(), request.sql, request.params, result);
       promise.SetValue(Status());
     } catch (const std::exception& e) {
       promise.SetValue(Status(-1, e.what()));
@@ -75,7 +77,14 @@ Status MysqlExecutor::SubmitAndWait(MysqlConnectionPtr conn, const MysqlRequest&
   }
   
   // Wait for result with timeout
-  auto status = trpc::future::BlockingTryGet(std::move(future), timeout_ms);
+  // Use fiber::BlockingTryGet in fiber environment to avoid blocking pthread
+  std::optional<Future<Status>> status;
+  if (trpc::IsRunningInFiberWorker()) {
+    status = trpc::fiber::BlockingTryGet(std::move(future), timeout_ms);
+  } else {
+    status = trpc::future::BlockingTryGet(std::move(future), timeout_ms);
+  }
+  
   if (!status) {
     return Status(-1, "Execute timeout");
   }
@@ -96,7 +105,7 @@ Future<MysqlResultSet> MysqlExecutor::SubmitAsync(MysqlConnectionPtr conn,
   auto task = [this, conn, request, promise = std::move(promise)]() mutable {
     try {
       MysqlResultSet result;
-      ExecuteTask(conn->GetRawConnection(), request, &result);
+      ExecutePreparedSql(conn->GetRawConnection(), request.sql, request.params, &result);
       promise.SetValue(std::move(result));
     } catch (const std::exception& e) {
       promise.SetException(CommonException(e.what()));
@@ -109,52 +118,6 @@ Future<MysqlResultSet> MysqlExecutor::SubmitAsync(MysqlConnectionPtr conn,
   }
   
   return future;
-}
-
-void MysqlExecutor::ExecuteTask(MYSQL* mysql, const MysqlRequest& request,
-                                MysqlResultSet* result) {
-  if (request.is_prepared) {
-    ExecutePreparedSql(mysql, request.sql, request.params, result);
-  } else {
-    ExecuteSql(mysql, request.sql, result);
-  }
-}
-
-void MysqlExecutor::ExecuteSql(MYSQL* mysql, const std::string& sql,
-                               MysqlResultSet* result) {
-  result->Clear();
-  
-  // Execute query
-  if (mysql_real_query(mysql, sql.c_str(), sql.length()) != 0) {
-    std::string error_msg = mysql_error(mysql);
-    int error_code = mysql_errno(mysql);
-    TRPC_FMT_ERROR("mysql_real_query failed: [{}] {}", error_code, error_msg);
-    throw std::runtime_error("MySQL query error: " + error_msg);
-  }
-  
-  // Get result
-  MYSQL_RES* res = mysql_store_result(mysql);
-  if (res) {
-    // SELECT query with results
-    ParseResultSet(res, result);
-    mysql_free_result(res);
-  } else {
-    // Non-SELECT query or error
-    if (mysql_field_count(mysql) == 0) {
-      // Non-SELECT query (INSERT/UPDATE/DELETE)
-      result->affected_rows = mysql_affected_rows(mysql);
-      result->insert_id = mysql_insert_id(mysql);
-      
-      TRPC_FMT_DEBUG("Query affected {} rows, insert_id: {}",
-                     result->affected_rows, result->insert_id);
-    } else {
-      // Error occurred
-      std::string error_msg = mysql_error(mysql);
-      int error_code = mysql_errno(mysql);
-      TRPC_FMT_ERROR("mysql_store_result failed: [{}] {}", error_code, error_msg);
-      throw std::runtime_error("MySQL result error: " + error_msg);
-    }
-  }
 }
 
 void MysqlExecutor::ExecutePreparedSql(MYSQL* mysql, const std::string& sql,

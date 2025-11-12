@@ -42,65 +42,6 @@ void MysqlServiceProxy::Destroy() {
   ServiceProxy::Destroy();
 }
 
-Status MysqlServiceProxy::Execute(const ClientContextPtr& context, const std::string& sql,
-                                  MysqlResultSet* result) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.is_prepared = false;
-  
-  return ExecuteInternal(context, request, result);
-}
-
-Status MysqlServiceProxy::Query(const ClientContextPtr& context, const std::string& sql,
-                                MysqlResultSet* result) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.is_prepared = false;
-  
-  return ExecuteInternal(context, request, result);
-}
-
-Status MysqlServiceProxy::PreparedExecute(const ClientContextPtr& context,
-                                         const std::string& sql,
-                                         const std::vector<std::string>& params,
-                                         MysqlResultSet* result) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.params = params;
-  request.is_prepared = true;
-  
-  return ExecuteInternal(context, request, result);
-}
-
-Future<MysqlResultSet> MysqlServiceProxy::AsyncExecute(const ClientContextPtr& context,
-                                                       const std::string& sql) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.is_prepared = false;
-  
-  return AsyncExecuteInternal(context, request);
-}
-
-Future<MysqlResultSet> MysqlServiceProxy::AsyncQuery(const ClientContextPtr& context,
-                                                     const std::string& sql) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.is_prepared = false;
-  
-  return AsyncExecuteInternal(context, request);
-}
-
-Future<MysqlResultSet> MysqlServiceProxy::AsyncPreparedExecute(
-    const ClientContextPtr& context, const std::string& sql,
-    const std::vector<std::string>& params) {
-  MysqlRequest request;
-  request.sql = sql;
-  request.params = params;
-  request.is_prepared = true;
-  
-  return AsyncExecuteInternal(context, request);
-}
-
 void MysqlServiceProxy::InitTransport() {
   // Don't use standard transport, use connection pool instead
   auto config = ParseConfig();
@@ -142,21 +83,21 @@ Status MysqlServiceProxy::ExecuteInternal(const ClientContextPtr& context,
     return Status(-1, "Filter rejected request");
   }
   
-  // Get connection from pool
+  // Borrow connection from pool
   uint32_t conn_timeout = context->GetTimeout() > 0 ? context->GetTimeout() : 3000;
-  auto conn = conn_pool_->GetConnection(conn_timeout);
-  if (!conn) {
+  auto handle = conn_pool_->Borrow(conn_timeout);
+  if (!handle) {
     context->SetStatus(Status(-1, "Failed to get connection from pool"));
     RunFilters(FilterPoint::CLIENT_POST_RPC_INVOKE, context);
     return context->GetStatus();
   }
   
+  auto conn = handle.Get();
+  
   // Execute SQL
   uint32_t exec_timeout = context->GetTimeout() > 0 ? context->GetTimeout() : 30000;
   Status status = executor_->SubmitAndWait(conn, request, result, exec_timeout);
   
-  // Return connection to pool
-  conn_pool_->ReturnConnection(conn);
   
   // Set status and run post-invoke filters
   context->SetStatus(status);
@@ -185,20 +126,23 @@ Future<MysqlResultSet> MysqlServiceProxy::AsyncExecuteInternal(
         CommonException("Filter rejected request"));
   }
   
-  // Get connection from pool
+  // Borrow connection from pool
   uint32_t conn_timeout = context->GetTimeout() > 0 ? context->GetTimeout() : 3000;
-  auto conn = conn_pool_->GetConnection(conn_timeout);
-  if (!conn) {
+  auto handle = conn_pool_->Borrow(conn_timeout);
+  if (!handle) {
     return MakeExceptionFuture<MysqlResultSet>(
         CommonException("Failed to get connection from pool"));
   }
   
+  auto conn = handle.Get();
+  
   // Submit async task
+  // Note: We need to keep the handle alive until the future completes
   auto future = executor_->SubmitAsync(conn, request);
   
   // Return connection when done
-  return future.Then([this, conn, context](Future<MysqlResultSet>&& f) mutable {
-    conn_pool_->ReturnConnection(conn);
+  return future.Then([this, handle = std::move(handle), context](Future<MysqlResultSet>&& f) mutable {
+    // Connection will be automatically returned when handle goes out of scope
     
     if (f.IsReady()) {
       context->SetStatus(Status());
@@ -261,11 +205,6 @@ Status MysqlServiceProxy::Execute(const ClientContextPtr& context, const MysqlSt
   return ExecuteInternal(context, request, result);
 }
 
-Status MysqlServiceProxy::Query(const ClientContextPtr& context, const MysqlStatement& statement,
-                                MysqlResultSet* result) {
-  return Execute(context, statement, result);
-}
-
 Future<MysqlResultSet> MysqlServiceProxy::AsyncExecute(const ClientContextPtr& context,
                                                        const MysqlStatement& statement) {
   MysqlRequest request;
@@ -274,11 +213,6 @@ Future<MysqlResultSet> MysqlServiceProxy::AsyncExecute(const ClientContextPtr& c
   request.params = statement.GetParamsAsStrings();
   
   return AsyncExecuteInternal(context, request);
-}
-
-Future<MysqlResultSet> MysqlServiceProxy::AsyncQuery(const ClientContextPtr& context,
-                                                     const MysqlStatement& statement) {
-  return AsyncExecute(context, statement);
 }
 
 }  // namespace trpc::mysql

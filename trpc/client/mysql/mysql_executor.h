@@ -62,12 +62,6 @@ class MysqlExecutor {
   Future<MysqlResultSet> SubmitAsync(MysqlConnectionPtr conn, const MysqlRequest& request);
   
  private:
-  /// @brief Execute SQL query in thread pool
-  void ExecuteTask(MYSQL* mysql, const MysqlRequest& request, MysqlResultSet* result);
-  
-  /// @brief Execute normal SQL statement
-  void ExecuteSql(MYSQL* mysql, const std::string& sql, MysqlResultSet* result);
-  
   /// @brief Execute prepared statement
   void ExecutePreparedSql(MYSQL* mysql, const std::string& sql,
                          const std::vector<std::string>& params,
