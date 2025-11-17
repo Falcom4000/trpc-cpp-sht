@@ -124,18 +124,12 @@ void LruCacheClientFilter::HandlePreInvoke(FilterStatus& status, const ClientCon
     return;
   }
 
-  // Store cache key in context for POST point
-  context->SetFilterData<std::string>(kLruCacheKeyIndex, std::move(cache_key));
-
   // Try to get from cache
-  const std::string* stored_key = context->GetFilterData<std::string>(kLruCacheKeyIndex);
-  if (!stored_key) {
-    return;
-  }
-
-  auto cached_value = cache_->Get(*stored_key);
+  auto cached_value = cache_->Get(cache_key);
   if (!cached_value.has_value()) {
     TRPC_FMT_DEBUG("Cache miss for method {}", func_name);
+    // Store cache key in context for POST point (to cache the response)
+    context->SetFilterData<std::string>(kLruCacheKeyIndex, std::move(cache_key));
     return;
   }
 
@@ -143,11 +137,11 @@ void LruCacheClientFilter::HandlePreInvoke(FilterStatus& status, const ClientCon
   if (!DeserializeResponse(cached_value.value(), context)) {
     TRPC_FMT_WARN("Failed to deserialize cached response for method {}", func_name);
     // Remove invalid cache entry
-    cache_->Remove(*stored_key);
+    cache_->Remove(cache_key);
     return;
   }
 
-  TRPC_FMT_DEBUG("Cache hit for method {}, key: {}", func_name, *stored_key);
+  TRPC_FMT_DEBUG("Cache hit for method {}, key: {}", func_name, cache_key);
 
   // Set success status to indicate cache hit
   context->SetStatus(Status(0, "cache_hit"));
