@@ -1,0 +1,48 @@
+global:
+  threadmodel:
+    fiber:
+      - instance_name: fiber_instance
+        concurrency_hint: 16  # 增加到 16，充分利用多核 CPU
+
+server:
+  app: benchmark
+  server: mysql
+  admin_port: 6666
+  admin_ip: 0.0.0.0
+  service:
+    - name: trpc.benchmark.mysql.Greeter
+      protocol: trpc
+      network: tcp
+      ip: 0.0.0.0
+      port: 54320
+      max_conn_num: 10000  # 明确设置最大连接数（默认值，但显式设置更清晰）
+
+client:
+  service:
+    - name: trpc.mysql.test.service
+      target: 127.0.0.1:3306
+      protocol: trpc
+      network: tcp
+      timeout: 5000
+      selector_name: direct
+      # MySQL specific configuration
+      mysql:
+        user: root
+        password: root
+        database: test_db
+        charset: utf8mb4
+        max_connections: 500  # 增加到 500，匹配并发协程数，减少等待
+        min_idle_connections: 50  # 增加最小空闲连接，快速响应
+        max_idle_time_ms: 60000
+        connect_timeout_ms: 3000
+        read_timeout_ms: 30000
+        write_timeout_ms: 30000
+        executor_thread_num: 32  # 增加到 32，提高并发处理能力
+
+plugins:
+  log:
+    default:
+      - name: default
+        sinks:
+          local_file:
+            filename: trpc_fiber_server.log

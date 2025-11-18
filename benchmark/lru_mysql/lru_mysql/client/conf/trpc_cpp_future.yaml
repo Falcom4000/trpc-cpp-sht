@@ -1,0 +1,23 @@
+global:
+  threadmodel:
+    default:
+      - instance_name: default_instance
+        io_handle_type: separate
+        io_thread_num: 2
+        handle_thread_num: 6
+
+client:
+  service:
+    - name: trpc.benchmark.mysql.Greeter
+      target: 127.0.0.1:54320
+      protocol: trpc
+      network: tcp
+      selector_name: direct
+
+plugins:
+  log:
+    default:
+      - name: default
+        sinks:
+          local_file:
+            filename: trpc_client.log

@@ -1,0 +1,22 @@
+# Use local trpc-cpp code instead of fetching from remote
+# local_repository is a built-in Bazel function, no need to load it
+local_repository(
+    name = "trpc_cpp",
+    path = "../../..",  # Path from benchmark/lru_mysql/lru_mysql to trpc-cpp-sht root
+)
+
+load("@trpc_cpp//trpc:workspace.bzl", "trpc_workspace")
+
+trpc_workspace()
+
+# MySQL client library (system installation)
+# This must be defined after trpc_workspace() as it's used by trpc MySQL client
+local_repository(
+    name = "com_github_mysql_mysql",
+    path = "../../../third_party/com_github_mysql_mysql",  # Path from benchmark/lru_mysql/lru_mysql to third_party
+)
+
+local_repository(
+    name = "proto",
+    path = "./proto",
+)

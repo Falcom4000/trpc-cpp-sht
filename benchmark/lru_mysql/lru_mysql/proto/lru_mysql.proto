@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package trpc.benchmark.mysql;
+
+service Greeter {
+  rpc GetID (IDRequest) returns (IDReply) {}
+}
+
+message IDRequest {
+   string msg = 1;
+}
+
+message IDReply {
+   string msg = 1;
+}

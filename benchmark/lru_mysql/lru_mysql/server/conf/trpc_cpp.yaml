@@ -1,0 +1,49 @@
+global:
+  threadmodel:
+    default:
+      - instance_name: default_instance
+        io_handle_type: separate
+        io_thread_num: 2
+        handle_thread_num: 6
+
+server:
+  app: benchmark
+  server: mysql
+  admin_port: 6666
+  admin_ip: 0.0.0.0
+  service:
+    - name: trpc.benchmark.mysql.Greeter
+      protocol: trpc
+      network: tcp
+      ip: 0.0.0.0
+      port: 54320
+
+client:
+  service:
+    - name: trpc.mysql.test.service
+      target: 127.0.0.1:3306
+      protocol: mysql
+      network: tcp
+      timeout: 5000
+      selector_name: direct
+      # MySQL specific configuration
+      mysql:
+        user: root
+        password: root
+        database: test_db
+        charset: utf8mb4
+        max_connections: 200
+        min_idle_connections: 20
+        max_idle_time_ms: 60000
+        connect_timeout_ms: 3000
+        read_timeout_ms: 30000
+        write_timeout_ms: 30000
+        executor_thread_num: 8
+
+plugins:
+  log:
+    default:
+      - name: default
+        sinks:
+          local_file:
+            filename: trpc_server.log

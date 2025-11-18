@@ -182,7 +182,8 @@ MysqlConnectionPtr MysqlConnectionPool::CreateConnection() {
     connection_properties["OPT_CONNECT_TIMEOUT"] = static_cast<int>(config_.connect_timeout_ms / 1000);
     connection_properties["OPT_READ_TIMEOUT"] = static_cast<int>(config_.read_timeout_ms / 1000);
     connection_properties["OPT_WRITE_TIMEOUT"] = static_cast<int>(config_.write_timeout_ms / 1000);
-    connection_properties["OPT_RECONNECT"] = true;
+    // OPT_RECONNECT is deprecated in MySQL 8.0+, removed to avoid warnings
+    // MySQL 8.0+ automatically handles reconnection
     connection_properties["OPT_CHARSET_NAME"] = config_.charset;
     
     // Create connection using ConnectOptionsMap

@@ -1,0 +1,23 @@
+global:
+  threadmodel:
+    fiber:
+      - instance_name: fiber_instance
+        concurrency_hint: 16  # 增加到 16，充分利用多核 CPU
+
+client:
+  service:
+    - name: trpc.benchmark.mysql.Greeter
+      target: 127.0.0.1:54320
+      protocol: trpc
+      network: tcp
+      selector_name: direct
+      max_conn_num: 500  # 增加到 500，支持高并发（trpc 协议使用 connection complex，但增加此值可以避免连接问题）
+      timeout: 30000  # 增加超时时间到 30 秒
+
+plugins:
+  log:
+    default:
+      - name: default
+        sinks:
+          local_file:
+            filename: trpc_fiber_client.log
